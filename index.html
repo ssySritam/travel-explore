@@ -1,0 +1,1063 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>TerraVoyage — Travel Explorer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Leaflet (maps) -->
+    <link rel="stylesheet"
+          href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+          integrity="sha256-p4NxA1M3aQG2zFEpF6CkHnI3PQb6qH7QvM/3p1rZp3s="
+          crossorigin="" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-Vt8VHD6WyZQoVZ5G2gvM0rGQ0u+GZC66R5Q8Z8vG8v0="
+            crossorigin=""></script>
+    <!-- Three.js (3D) -->
+    <script src="https://unpkg.com/three@0.157.0/build/three.min.js"></script>
+    <!-- GSAP (animations) -->
+    <script src="https://unpkg.com/gsap@3.12.5/dist/gsap.min.js"></script>
+    <!-- Icons -->
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #0b0f1a;
+            --panel: rgba(255,255,255,0.06);
+            --glass: rgba(255,255,255,0.12);
+            --text: #e6eaf2;
+            --muted: #9aa3b2;
+            --accent: #74c0ff;
+            --accent-2: #ffd479;
+            --border: rgba(255,255,255,0.12);
+            --shadow: 0 10px 30px rgba(0,0,0,0.35);
+            --radius: 18px;
+        }
+
+        [data-theme="light"] {
+            --bg: #f6f8fc;
+            --panel: rgba(255,255,255,0.85);
+            --glass: rgba(255,255,255,0.9);
+            --text: #1c2230;
+            --muted: #4b5565;
+            --accent: #2563eb;
+            --accent-2: #f59e0b;
+            --border: rgba(0,0,0,0.1);
+            --shadow: 0 15px 40px rgba(0,0,0,0.15);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+            background: radial-gradient(1200px 500px at 70% 10%, rgba(116,192,255,0.25), transparent 60%), var(--bg);
+            color: var(--text);
+            overflow: hidden;
+        }
+
+        /* App layout */
+        .app {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            grid-template-columns: 360px 1fr;
+            grid-template-areas:
+                "header header"
+                "sidebar main";
+            height: 100vh;
+        }
+
+        header {
+            grid-area: header;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 18px;
+            backdrop-filter: saturate(1.2) blur(10px);
+            background: linear-gradient(180deg, var(--glass), transparent);
+            border-bottom: 1px solid var(--border);
+            position: relative;
+            z-index: 5;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+            color: var(--text);
+        }
+
+            .brand .logo {
+                width: 36px;
+                height: 36px;
+                border-radius: 12px;
+                background: linear-gradient(135deg, var(--accent), var(--accent-2));
+                box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+            }
+
+        .search {
+            flex: 1;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+            .search input {
+                flex: 1;
+                padding: 12px 16px;
+                border-radius: 14px;
+                border: 1px solid var(--border);
+                outline: none;
+                background: var(--panel);
+                color: var(--text);
+                transition: border-color .2s ease, box-shadow .2s ease;
+            }
+
+                .search input:focus {
+                    border-color: var(--accent);
+                    box-shadow: 0 0 0 4px color-mix(in oklab, var(--accent) 30%, transparent);
+                }
+
+            .search button {
+                padding: 11px 14px;
+                border-radius: 12px;
+                border: 1px solid var(--border);
+                background: var(--panel);
+                color: var(--text);
+                cursor: pointer;
+                transition: transform .2s ease, background .2s ease;
+            }
+
+                .search button:hover {
+                    transform: translateY(-1px);
+                    background: var(--glass);
+                }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            background: var(--panel);
+            cursor: pointer;
+            user-select: none;
+        }
+
+            .toggle span {
+                color: var(--muted);
+                font-weight: 600;
+            }
+
+        /* Sidebar */
+        aside {
+            grid-area: sidebar;
+            padding: 14px;
+            overflow: hidden;
+            border-right: 1px solid var(--border);
+            background: linear-gradient(180deg, var(--glass), transparent 60%);
+            position: relative;
+            z-index: 3;
+        }
+
+        .sidebar-panel {
+            height: 100%;
+            border-radius: var(--radius);
+            background: var(--panel);
+            backdrop-filter: blur(12px) saturate(1.2);
+            box-shadow: var(--shadow);
+            display: grid;
+            grid-template-rows: auto auto 1fr auto;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .filters {
+            padding: 10px 16px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            border-bottom: 1px solid var(--border);
+        }
+
+            .filters select, .filters .pill {
+                padding: 10px 12px;
+                border-radius: 12px;
+                border: 1px solid var(--border);
+                background: var(--glass);
+                color: var(--text);
+                outline: none;
+            }
+
+        .cards {
+            position: relative;
+            overflow-y: auto;
+            padding: 12px;
+            scroll-behavior: smooth;
+        }
+
+        .card {
+            border-radius: 14px;
+            border: 1px solid var(--border);
+            background: color-mix(in oklab, var(--panel) 80%, black 20%);
+            overflow: hidden;
+            margin: 10px 0;
+            box-shadow: 0 8px 26px rgba(0,0,0,0.25);
+            transition: transform .25s ease, box-shadow .25s ease, background .25s ease;
+        }
+
+            .card:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+            }
+
+        .card-img {
+            height: 160px;
+            width: 100%;
+            object-fit: cover;
+            display: block;
+            filter: saturate(1.05) contrast(1.02);
+            transform: scale(1.02);
+            transition: transform .4s ease;
+        }
+
+        .card:hover .card-img {
+            transform: scale(1.06);
+        }
+
+        .card-body {
+            padding: 12px 14px;
+            display: grid;
+            gap: 8px;
+        }
+
+        .title {
+            font-weight: 700;
+            letter-spacing: .2px;
+        }
+
+        .meta {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            padding: 9px 12px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--glass);
+            color: var(--text);
+            cursor: pointer;
+            transition: background .2s ease, transform .2s ease;
+            font-weight: 600;
+        }
+
+            .btn:hover {
+                background: var(--panel);
+                transform: translateY(-1px);
+            }
+
+        .sentinel {
+            height: 30px;
+        }
+
+        .empty {
+            padding: 16px;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        /* Main map + hero */
+        main {
+            grid-area: main;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+        }
+
+        canvas#bg3d {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        .map-panel {
+            position: absolute;
+            inset: 18px;
+            border-radius: var(--radius);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            backdrop-filter: blur(10px) saturate(1.2);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            grid-template-areas: "map details";
+            gap: 0;
+        }
+
+        #map {
+            grid-area: map;
+            width: 100%;
+            height: 100%;
+        }
+
+        .details {
+            grid-area: details;
+            border-left: 1px solid var(--border);
+            display: grid;
+            grid-template-rows: auto 1fr;
+            background: linear-gradient(180deg, var(--glass), transparent);
+        }
+
+        .details-header {
+            padding: 12px 14px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .details-body {
+            padding: 10px 12px;
+            overflow-y: auto;
+        }
+
+        .chip {
+            display: inline-flex;
+            gap: 8px;
+            align-items: center;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            background: var(--glass);
+            color: var(--text);
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        /* Utility */
+        .row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .spacer {
+            flex: 1;
+        }
+
+        .muted {
+            color: var(--muted);
+        }
+
+        a.link {
+            color: var(--accent);
+            text-decoration: none;
+        }
+
+            a.link:hover {
+                text-decoration: underline;
+            }
+
+        /* Scrollbars */
+        .cards::-webkit-scrollbar,
+        .details-body::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        .cards::-webkit-scrollbar-thumb,
+        .details-body::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 10px;
+        }
+
+        /* Responsive */
+        @media (max-width: 1100px) {
+            .app {
+                grid-template-columns: 1fr;
+                grid-template-areas:
+                    "header"
+                    "main";
+            }
+
+            aside {
+                display: none;
+            }
+
+            .map-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .details {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app" id="app" data-theme="dark">
+        <header>
+            <div class="brand">
+                <div class="logo"></div>
+                <div>TerraVoyage</div>
+            </div>
+            <div class="search">
+                <input id="searchInput" type="text" placeholder="Search destinations (e.g., Paris, Machu Picchu, Great Barrier Reef)" />
+                <button id="nearbyBtn" title="Find nearby">Nearby</button>
+                <button id="clearBtn" title="Clear">Clear</button>
+            </div>
+            <div class="actions">
+                <div class="toggle" id="themeToggle">
+                    <span>Theme</span>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 3v2M12 19v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M3 12h2M19 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" stroke="currentColor" stroke-width="2" />
+                        <circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2" />
+                    </svg>
+                </div>
+            </div>
+        </header>
+
+        <aside>
+            <div class="sidebar-panel">
+                <div class="sidebar-header">
+                    <div class="row">
+                        <strong>Explore</strong>
+                        <span class="chip">Infinite scroll</span>
+                    </div>
+                    <div class="muted">Curated & nearby</div>
+                </div>
+                <div class="filters">
+                    <select id="categorySelect">
+                        <option value="">All categories</option>
+                        <option>Landmarks</option>
+                        <option>Nature</option>
+                        <option>Museums</option>
+                        <option>Mountains</option>
+                        <option>Beaches</option>
+                        <option>Cityscapes</option>
+                    </select>
+                    <select id="sortSelect">
+                        <option value="distance">Sort by distance</option>
+                        <option value="popularity">Sort by popularity</option>
+                        <option value="alphabetical">Sort A–Z</option>
+                    </select>
+                </div>
+                <div id="cards" class="cards">
+                    <div class="empty">Search a destination or tap Nearby to load places around you. Scroll for more.</div>
+                    <div id="sentinel" class="sentinel"></div>
+                </div>
+                <div style="padding: 12px; border-top: 1px solid var(--border); display:flex; gap:8px; justify-content: space-between; align-items:center;">
+                    <div class="muted">Tips: Drag the map. Click cards to focus.</div>
+                    <button id="resetView" class="btn">Reset view</button>
+                </div>
+            </div>
+        </aside>
+
+        <main>
+            <div class="hero">
+                <canvas id="bg3d"></canvas>
+            </div>
+            <div class="map-panel">
+                <div id="map"></div>
+                <div class="details">
+                    <div class="details-header">
+                        <strong>Details</strong>
+                        <div class="row">
+                            <span class="chip" id="weatherChip">Weather: —</span>
+                            <span class="chip" id="coordsChip">Lat/Lng: —</span>
+                        </div>
+                    </div>
+                    <div class="details-body" id="detailsBody">
+                        <div class="muted">Select a place to see info, routes, and suggestions.</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>// App state
+    const state = {
+      theme: localStorage.getItem('terravoyage-theme') || 'dark',
+      map: null,
+      userPos: { lat: 20.2961, lng: 85.8245 }, // Default: Bhubaneswar
+      focusPos: null,
+      markers: [],
+      routeLayer: null,
+      batch: 0,
+      pageSize: 12,
+      loading: false,
+      lastQueryCenter: null,
+      cardsCache: [],
+      popularSeed: [
+        { title: 'Eiffel Tower', lat: 48.8584, lng: 2.2945, category: 'Landmarks' },
+        { title: 'Grand Canyon', lat: 36.1069, lng: -112.1129, category: 'Nature' },
+        { title: 'Louvre Museum', lat: 48.8606, lng: 2.3376, category: 'Museums' },
+        { title: 'Mount Everest', lat: 27.9881, lng: 86.9250, category: 'Mountains' },
+        { title: 'Bondi Beach', lat: -33.8908, lng: 151.2773, category: 'Beaches' },
+        { title: 'Tokyo Skyline', lat: 35.6762, lng: 139.6503, category: 'Cityscapes' },
+        { title: 'Machu Picchu', lat: -13.1631, lng: -72.5450, category: 'Mountains' },
+        { title: 'Victoria Falls', lat: -17.9243, lng: 25.8560, category: 'Nature' },
+        { title: 'Santorini', lat: 36.3932, lng: 25.4615, category: 'Beaches' },
+        { title: 'Burj Khalifa', lat: 25.1972, lng: 55.2744, category: 'Landmarks' },
+      ],
+    };
+
+    // Theme init
+    document.getElementById('app').setAttribute('data-theme', state.theme);
+    document.getElementById('themeToggle').addEventListener('click', () => {
+      state.theme = state.theme === 'dark' ? 'light' : 'dark';
+      document.getElementById('app').setAttribute('data-theme', state.theme);
+      localStorage.setItem('terravoyage-theme', state.theme);
+    });
+
+    // 3D Background — rotating globe + starfield
+    (function init3D() {
+      const canvas = document.getElementById('bg3d');
+      const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 0, 6);
+
+      // Lights
+      const light = new THREE.DirectionalLight(0xffffff, 0.8);
+      light.position.set(5, 5, 10);
+      scene.add(light);
+      scene.add(new THREE.AmbientLight(0x88aaff, 0.2));
+
+      // Globe (wireframe)
+      const globeGeo = new THREE.SphereGeometry(2.2, 48, 48);
+      const globeMat = new THREE.MeshBasicMaterial({ color: 0x74c0ff, wireframe: true, transparent: true, opacity: 0.25 });
+      const globe = new THREE.Mesh(globeGeo, globeMat);
+      scene.add(globe);
+
+      // Atmosphere glow (sprite-ish)
+      const glowGeo = new THREE.SphereGeometry(2.25, 48, 48);
+      const glowMat = new THREE.MeshPhongMaterial({ color: 0x74c0ff, emissive: 0x2a6b9b, emissiveIntensity: 0.6, transparent: true, opacity: 0.08 });
+      const glow = new THREE.Mesh(glowGeo, glowMat);
+      scene.add(glow);
+
+      // Starfield
+      const stars = new THREE.Points(
+        new THREE.BufferGeometry(),
+        new THREE.PointsMaterial({ color: 0xffffff, size: 0.01 })
+      );
+      const starCount = 1500;
+      const positions = new Float32Array(starCount * 3);
+      for (let i = 0; i < starCount; i++) {
+        positions[i*3] = (Math.random() - 0.5) * 50;
+        positions[i*3+1] = (Math.random() - 0.5) * 50;
+        positions[i*3+2] = (Math.random() - 0.5) * 50;
+      }
+      stars.geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      scene.add(stars);
+
+      // Resize
+      function onResize() {
+        const w = window.innerWidth;
+        const h = window.innerHeight;
+        renderer.setSize(w, h);
+        camera.aspect = w / h;
+        camera.updateProjectionMatrix();
+      }
+      window.addEventListener('resize', onResize);
+      onResize();
+
+      // Animate
+      gsap.to(globe.rotation, { y: Math.PI * 2, duration: 120, repeat: -1, ease: 'none' });
+      gsap.to(stars.rotation, { y: Math.PI * 2, duration: 220, repeat: -1, ease: 'none' });
+      gsap.to(glow.material, { opacity: 0.16, duration: 3, yoyo: true, repeat: -1, ease: 'sine.inOut' });
+
+      function tick() {
+        renderer.render(scene, camera);
+        requestAnimationFrame(tick);
+      }
+      tick();
+    })();
+
+    // Map init
+    let mapReadyResolve;
+    const mapReadyPromise = new Promise(res => (mapReadyResolve = res));
+
+    function initMap() {
+      const map = L.map('map', {
+        zoomControl: true,
+        preferCanvas: true,
+      }).setView([state.userPos.lat, state.userPos.lng], 11);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+
+      state.map = map;
+      mapReadyResolve();
+
+      // Try geolocate
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            state.userPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            map.setView([state.userPos.lat, state.userPos.lng], 12);
+            addPulseMarker(state.userPos, 'You are here');
+          },
+          () => {
+            addPulseMarker(state.userPos, 'Default start');
+          },
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      } else {
+        addPulseMarker(state.userPos, 'Default start');
+      }
+
+      // Map drag end => refresh nearby
+      map.on('moveend', () => {
+        state.lastQueryCenter = map.getCenter();
+        // Passive: do not auto-fetch to avoid rate limits; Nearby button triggers fetch
+      });
+    }
+
+    function addPulseMarker(pos, label) {
+      const c = L.circleMarker([pos.lat, pos.lng], {
+        radius: 8,
+        color: '#74c0ff',
+        fillColor: '#74c0ff',
+        fillOpacity: 0.7
+      }).addTo(state.map).bindTooltip(label, { permanent: false });
+      state.markers.push(c);
+    }
+
+    initMap();
+
+    // UI elements
+    const searchInput = document.getElementById('searchInput');
+    const nearbyBtn = document.getElementById('nearbyBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const cardsEl = document.getElementById('cards');
+    const sentinelEl = document.getElementById('sentinel');
+    const detailsBody = document.getElementById('detailsBody');
+    const weatherChip = document.getElementById('weatherChip');
+    const coordsChip = document.getElementById('coordsChip');
+    const resetViewBtn = document.getElementById('resetView');
+    const sortSelect = document.getElementById('sortSelect');
+    const categorySelect = document.getElementById('categorySelect');
+
+    // Search handlers
+    searchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        const q = searchInput.value.trim();
+        if (q) searchPlace(q);
+      }
+    });
+    nearbyBtn.addEventListener('click', () => loadNearby());
+    clearBtn.addEventListener('click', () => {
+      cardsEl.innerHTML = '<div class="empty">Cleared. Search a destination or tap Nearby.</div><div id="sentinel" class="sentinel"></div>';
+      state.batch = 0;
+      state.cardsCache = [];
+    });
+    resetViewBtn.addEventListener('click', () => {
+      state.map.setView([state.userPos.lat, state.userPos.lng], 12);
+      if (state.routeLayer) {
+        state.map.removeLayer(state.routeLayer);
+        state.routeLayer = null;
+      }
+    });
+
+    // Sorting/filtering
+    sortSelect.addEventListener('change', () => renderCards());
+    categorySelect.addEventListener('change', () => renderCards());
+
+    // Infinite scroll observer
+    const observer = new IntersectionObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting && !state.loading) {
+          // load next batch
+          if (state.lastQueryCenter) {
+            loadNearbyBatch(state.lastQueryCenter, state.batch);
+          } else {
+            // fall back to curated
+            loadCuratedBatch();
+          }
+        }
+      }
+    });
+    observer.observe(sentinelEl);
+
+    // Core: Geocode via Nominatim
+    async function searchPlace(query) {
+      await mapReadyPromise;
+      try {
+        const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`;
+        const res = await fetch(url, { headers: { 'Accept-Language': 'en' }});
+        const data = await res.json();
+        if (!data.length) {
+          notify('No results found.');
+          return;
+        }
+        const { lat, lon, display_name } = data[0];
+        const latNum = parseFloat(lat), lonNum = parseFloat(lon);
+        state.map.setView([latNum, lonNum], 12);
+        state.focusPos = { lat: latNum, lng: lonNum, name: display_name };
+        state.lastQueryCenter = state.map.getCenter();
+
+        // Update details
+        setDetails({
+          title: display_name,
+          description: 'Explore the area, nearby sights, weather, and routes.',
+          coords: [latNum, lonNum],
+          links: [
+            { label: 'Open in Google Maps', href: `https://www.google.com/maps/search/?api=1&query=${latNum},${lonNum}` }
+          ]
+        });
+
+        // Weather
+        updateWeather(latNum, lonNum);
+
+        // Clear and load nearby
+        cardsEl.innerHTML = '';
+        appendSentinel();
+        state.batch = 0;
+        state.cardsCache = [];
+        loadNearbyBatch(state.map.getCenter(), state.batch);
+      } catch (err) {
+        notify('Search failed. Try again.');
+      }
+    }
+
+    // Nearby via Wikipedia Geosearch
+    async function loadNearby() {
+      await mapReadyPromise;
+      state.lastQueryCenter = state.map.getCenter();
+      cardsEl.innerHTML = '';
+      appendSentinel();
+      state.batch = 0;
+      state.cardsCache = [];
+      await loadNearbyBatch(state.lastQueryCenter, state.batch);
+    }
+
+    function appendSentinel() {
+      const s = document.createElement('div');
+      s.className = 'sentinel';
+      s.id = 'sentinel';
+      cardsEl.appendChild(s);
+      observer.observe(s);
+    }
+
+    async function loadNearbyBatch(center, batchIndex) {
+      if (state.loading) return;
+      state.loading = true;
+      const pageSize = state.pageSize;
+      const offset = batchIndex * pageSize;
+      const radius = 10000; // meters
+      const url = `https://en.wikipedia.org/w/api.php?origin=*&action=query&list=geosearch&gscoord=${center.lat}|${center.lng}&gsradius=${radius}&gslimit=${pageSize}&gsoffset=${offset}&format=json`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const pages = data.query?.geosearch || [];
+        if (!pages.length && batchIndex === 0) {
+          notify('No nearby places found. Try moving the map or widening search.');
+          state.loading = false;
+          return;
+        }
+
+        const items = await Promise.all(pages.map(async (p) => {
+          const summary = await fetchSummary(p.title);
+          const img = summary.thumbnail?.source || unsplashPlaceholder(p.title);
+          return {
+            id: p.pageid,
+            title: p.title,
+            lat: p.lat,
+            lng: p.lon,
+            distance: haversine(center.lat, center.lng, p.lat, p.lon),
+            extract: summary.extract || 'No description available.',
+            img,
+            category: inferCategory(p.title),
+            popularity: (summary.content_urls ? 100 : 50) + Math.random() * 50
+          };
+        }));
+
+        state.cardsCache.push(...items);
+        state.batch++;
+        renderCards();
+      } catch (err) {
+        notify('Failed to load nearby places.');
+      } finally {
+        state.loading = false;
+      }
+    }
+
+    // Curated fallback batch
+    async function loadCuratedBatch() {
+      if (state.loading) return;
+      state.loading = true;
+      const start = state.batch * state.pageSize;
+      const slice = state.popularSeed.slice(start, start + state.pageSize);
+      if (!slice.length) { state.loading = false; return; }
+      try {
+        const items = await Promise.all(slice.map(async (p) => {
+          const summary = await fetchSummary(p.title);
+          const img = summary.thumbnail?.source || unsplashPlaceholder(p.title);
+          const distance = haversine(state.userPos.lat, state.userPos.lng, p.lat, p.lng);
+          return {
+            id: `seed-${p.title}`,
+            title: p.title,
+            lat: p.lat,
+            lng: p.lng,
+            distance,
+            extract: summary.extract || 'No description available.',
+            img,
+            category: p.category,
+            popularity: (summary.content_urls ? 140 : 80) + Math.random() * 80
+          };
+        }));
+        state.cardsCache.push(...items);
+        state.batch++;
+        renderCards();
+      } catch(err) {
+        notify('Failed to load curated places.');
+      } finally {
+        state.loading = false;
+      }
+    }
+
+    // Wikipedia summary
+    async function fetchSummary(title) {
+      try {
+        const url = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
+        const res = await fetch(url);
+        return await res.json();
+      } catch {
+        return {};
+      }
+    }
+
+    // Weather via Open-Meteo (no key)
+    async function updateWeather(lat, lng) {
+      try {
+        const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&current=temperature_2m,wind_speed_10m`;
+        const res = await fetch(url);
+        const data = await res.json();
+        const t = data.current?.temperature_2m;
+        const w = data.current?.wind_speed_10m;
+        weatherChip.textContent = `Weather: ${t !== undefined ? `${Math.round(t)}°C` : '—'}, Wind ${w !== undefined ? `${Math.round(w)} m/s` : '—'}`;
+        coordsChip.textContent = `Lat/Lng: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      } catch {
+        weatherChip.textContent = 'Weather: —';
+        coordsChip.textContent = `Lat/Lng: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      }
+    }
+
+    // Cards render with sort/filter
+    function renderCards() {
+      const sortBy = sortSelect.value;
+      const category = categorySelect.value;
+      let items = state.cardsCache.slice();
+
+      if (category) items = items.filter(i => i.category === category);
+
+      switch (sortBy) {
+        case 'distance': items.sort((a,b) => a.distance - b.distance); break;
+        case 'popularity': items.sort((a,b) => b.popularity - a.popularity); break;
+        case 'alphabetical': items.sort((a,b) => a.title.localeCompare(b.title)); break;
+      }
+
+      const frag = document.createDocumentFragment();
+      items.forEach((i, idx) => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.innerHTML = `
+          <img class="card-img" alt="${escapeHtml(i.title)}" src="${i.img}">
+          <div class="card-body">
+            <div class="title">${escapeHtml(i.title)}</div>
+            <div class="meta">
+              <span>${formatKm(i.distance)}</span>
+              <span>•</span>
+              <span>${i.category}</span>
+            </div>
+            <div class="muted">${escapeHtml(i.extract)}</div>
+            <div class="btn-row">
+              <button class="btn" data-action="focus">Focus</button>
+              <button class="btn" data-action="route">Route</button>
+              <a class="btn" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${i.lat},${i.lng}">Open in Maps</a>
+            </div>
+          </div>
+        `;
+        // Hook events
+        card.querySelector('[data-action="focus"]').addEventListener('click', () => {
+          state.map.setView([i.lat, i.lng], 14);
+          showMarkerPulse(i);
+          setDetails({
+            title: i.title,
+            description: i.extract,
+            coords: [i.lat, i.lng],
+            links: [
+              { label: 'Wikipedia', href: `https://en.wikipedia.org/wiki/${encodeURIComponent(i.title)}` },
+              { label: 'Open in Google Maps', href: `https://www.google.com/maps/search/?api=1&query=${i.lat},${i.lng}` }
+            ]
+          });
+          updateWeather(i.lat, i.lng);
+        });
+        card.querySelector('[data-action="route"]').addEventListener('click', () => {
+          routeTo(i.lat, i.lng);
+        });
+
+        frag.appendChild(card);
+
+        // Subtle stagger animation
+        gsap.from(card, { y: 8, opacity: 0, duration: 0.35, ease: 'power2.out', delay: (idx % 6) * 0.04 });
+      });
+
+      // Replace content but keep sentinel at bottom
+      cardsEl.innerHTML = '';
+      cardsEl.appendChild(frag);
+      appendSentinel();
+    }
+
+    function showMarkerPulse(item) {
+      const pulse = L.circleMarker([item.lat, item.lng], {
+        radius: 8, color: '#ffd479', fillColor: '#ffd479', fillOpacity: 0.7
+      }).addTo(state.map).bindTooltip(item.title, { permanent: false });
+      setTimeout(() => {
+        state.map.removeLayer(pulse);
+      }, 3500);
+    }
+
+    // Route via OSRM demo (driving)
+    async function routeTo(destLat, destLng) {
+      const origin = state.userPos;
+      const url = `https://router.project-osrm.org/route/v1/driving/${origin.lng},${origin.lat};${destLng},${destLat}?overview=full&geometries=geojson`;
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        const route = data.routes?.[0]?.geometry;
+        if (!route) { notify('Routing failed.'); return; }
+        if (state.routeLayer) state.map.removeLayer(state.routeLayer);
+        state.routeLayer = L.geoJSON(route, {
+          style: { color: '#2563eb', weight: 5, opacity: 0.7 }
+        }).addTo(state.map);
+        const bounds = L.geoJSON(route).getBounds();
+        state.map.fitBounds(bounds, { padding: [40,40] });
+        setDetailsAppend(`
+          <div class="row" style="justify-content: space-between; margin-top:8px;">
+            <span class="chip">Route: ${formatKm(data.routes[0].distance / 1000)}</span>
+            <span class="chip">ETA: ${formatMin(data.routes[0].duration / 60)}</span>
+          </div>
+        `);
+      } catch {
+        notify('Routing service is unavailable right now.');
+      }
+    }
+
+    // Helpers
+    function notify(msg) {
+      const toast = document.createElement('div');
+      toast.textContent = msg;
+      toast.style.position = 'fixed';
+      toast.style.bottom = '20px';
+      toast.style.right = '20px';
+      toast.style.padding = '10px 12px';
+      toast.style.background = 'var(--panel)';
+      toast.style.border = '1px solid var(--border)';
+      toast.style.borderRadius = '12px';
+      toast.style.boxShadow = 'var(--shadow)';
+      toast.style.zIndex = 9999;
+      document.body.appendChild(toast);
+      gsap.to(toast, { autoAlpha: 0, y: 10, delay: 2.2, duration: 0.6, onComplete: () => toast.remove() });
+    }
+
+    function setDetails({ title, description, coords, links }) {
+      detailsBody.innerHTML = `
+        <div style="display:grid; gap:8px;">
+          <div style="font-weight:700;">${escapeHtml(title)}</div>
+          <div class="muted">${escapeHtml(description)}</div>
+          <div class="row">
+            <span class="chip">Lat: ${coords[0].toFixed(5)}</span>
+            <span class="chip">Lng: ${coords[1].toFixed(5)}</span>
+          </div>
+          <div class="row" style="flex-wrap:wrap; gap:6px;">
+            ${links.map(l => `<a class="chip link" target="_blank" rel="noopener" href="${l.href}">${escapeHtml(l.label)}</a>`).join('')}
+          </div>
+        </div>
+      `;
+    }
+    function setDetailsAppend(html) {
+      const wrap = document.createElement('div');
+      wrap.innerHTML = html;
+      detailsBody.appendChild(wrap);
+    }
+
+    function formatKm(km) {
+      if (!isFinite(km)) return '—';
+      return km < 1 ? `${Math.round(km*1000)} m` : `${km.toFixed(1)} km`;
+    }
+    function formatMin(min) {
+      if (!isFinite(min)) return '—';
+      if (min < 60) return `${Math.round(min)} min`;
+      const h = Math.floor(min / 60), m = Math.round(min % 60);
+      return `${h}h ${m}m`;
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    }
+    function haversine(lat1, lon1, lat2, lon2) {
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dLon/2)**2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    }
+    function toRad(deg) { return deg * Math.PI / 180; }
+    function inferCategory(title) {
+      const t = title.toLowerCase();
+      if (t.includes('museum')) return 'Museums';
+      if (t.includes('mount') || t.includes('peak')) return 'Mountains';
+      if (t.includes('beach')) return 'Beaches';
+      if (t.includes('national park') || t.includes('falls') || t.includes('lake')) return 'Nature';
+      if (t.includes('tower') || t.includes('palace') || t.includes('fort')) return 'Landmarks';
+      return 'Cityscapes';
+    }
+    function unsplashPlaceholder(query) {
+      // Note: source.unsplash.com doesn't require a key (randomized).
+      return `https://source.unsplash.com/800x600/?${encodeURIComponent(query)}&sig=${Math.floor(Math.random()*10000)}`;
+    }
+
+    // Initial curated batch for visual delight
+    loadCuratedBatch();</script>
+</body>
+</html>
